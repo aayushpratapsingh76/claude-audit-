@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infrastructure Audit & Performance TCO Report — Claude Sonnet 5 vs Sonnet 4.6 vs Opus 4.8</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Inter Display', 'SF Pro Display', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        glow: {
+                            start: '#FF6B6B',
+                            mid: '#FF8E8E',
+                            end: '#FFB3B3',
+                            soft: '#FFF0EE',
+                        },
+                        canvas: {
+                            DEFAULT: '#F9F8F7',
+                            alt: '#F4F2F0',
+                            card: '#FFFFFF',
+                        },
+                        ink: {
+                            DEFAULT: '#1A1A1A',
+                            muted: '#5C5C5C',
+                            faint: '#9E9E9E',
+                        },
+                    },
+                    boxShadow: {
+                        'card': '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)',
+                        'card-hover': '0 20px 50px rgba(255,107,107,0.10), 0 8px 24px rgba(0,0,0,0.06)',
+                        'card-lift': '0 32px 64px rgba(255,107,107,0.12), 0 12px 32px rgba(0,0,0,0.07)',
+                        'glow-sm': '0 0 40px rgba(255,107,107,0.08)',
+                        'glow-md': '0 0 80px rgba(255,107,107,0.12)',
+                        'glow-lg': '0 0 140px rgba(255,142,142,0.15)',
+                    },
+                },
+            },
+        }
+    </script>
+
+    <!-- Google Fonts: Inter + Inter Display -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --glow-start: #FF6B6B;
+            --glow-mid: #FF8E8E;
+            --glow-end: #FFB3B3;
+            --glow-soft: #FFF0EE;
+            --canvas: #F9F8F7;
+            --card: #FFFFFF;
+            --ink: #1A1A1A;
+            --ink-muted: #5C5C5C;
+            --spring-stiffness: 280;
+            --spring-damping: 28;
+            --spring-mass: 0.8;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: geometricPrecision;
+        }
+
+        body {
+            background-color: var(--canvas);
+            color: var(--ink);
+            font-family: 'Inter', 'Inter Display', 'SF Pro Display', system-ui, sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* ── Glow Orbs ── */
+        .glow-orb {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(60px);
+            opacity: 0;
+            transition: opacity 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: opacity, transform;
+        }
+        .glow-orb.visible {
+            opacity: 0.55;
+        }
+        .glow-orb--peach {
+            background: radial-gradient(circle, var(--glow-mid) 0%, transparent 70%);
+        }
+        .glow-orb--salmon {
+            background: radial-gradient(circle, var(--glow-start) 0%, transparent 70%);
+        }
+        .glow-orb--warm {
+            background: radial-gradient(circle, var(--glow-end) 0%, transparent 70%);
+        }
+
+        /* ── Cards ── */
+        .card-premium {
+            background: var(--card);
+            border-radius: 20px;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
+            transition: box-shadow 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
+                transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
+                border-color 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: transform, box-shadow;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+        }
+        .card-premium:hover {
+            box-shadow: 0 20px 50px rgba(255, 107, 107, 0.10), 0 8px 24px rgba(0, 0, 0, 0.06);
+            border-color: rgba(255, 107, 107, 0.18);
+            transform: translateY(-2px);
+        }
+        .card-premium.card--active {
+            box-shadow: 0 32px 64px rgba(255, 107, 107, 0.12), 0 12px 32px rgba(0, 0, 0, 0.07);
+            border-color: rgba(255, 107, 107, 0.25);
+            z-index: 10;
+        }
+        .card-premium .card-glow-line {
+            position: absolute;
+            top: 0;
+            left: 20px;
+            right: 20px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--glow-start), var(--glow-mid), transparent);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            z-index: 2;
+            pointer-events: none;
+        }
+        .card-premium:hover .card-glow-line,
+        .card-premium.card--active .card-glow-line {
+            opacity: 0.7;
+        }
+
+        /* ── Expandable Detail Panel ── */
+        .detail-panel {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.55s cubic-bezier(0.22, 0.61, 0.36, 1),
+                opacity 0.45s cubic-bezier(0.22, 0.61, 0.36, 1),
+                margin-top 0.55s cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: max-height, opacity;
+            margin-top: 0;
+        }
+        .detail-panel.expanded {
+            max-height: 2200px;
+            opacity: 1;
+            margin-top: 16px;
+        }
+
+        /* ── Benchmark Bars ── */
+        .benchmark-bar {
+            height: 10px;
+            border-radius: 5px;
+            background: linear-gradient(135deg, var(--glow-start), var(--glow-mid));
+            width: 0%;
+            transition: width 1.2s cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: width;
+            position: relative;
+        }
+        .benchmark-bar.bar--sonnet46 {
+            background: linear-gradient(135deg, #D4D4D4, #B0B0B0);
+        }
+        .benchmark-bar.bar--sonnet5 {
+            background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+        }
+        .benchmark-bar.bar--opus48 {
+            background: linear-gradient(135deg, #E85D5D, #C94A4A);
+        }
+        .benchmark-bar.animated {
+            animation: barFill 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+
+        @keyframes barFill {
+            from {
+                width: 0%;
+            }
+            to {
+                width: var(--target-width);
+            }
+        }
+
+        /* ── Pulse Dot ── */
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--glow-start);
+            display: inline-block;
+            animation: pulse 2.2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.5);
+            }
+            50% {
+                box-shadow: 0 0 0 12px rgba(255, 107, 107, 0);
+            }
+        }
+
+        /* ── Number Counter ── */
+        .counter-value {
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: "tnum";
+            transition: color 0.3s ease;
+        }
+
+        /* ── TCO Table ── */
+        .tco-row {
+            transition: background-color 0.35s ease, transform 0.35s ease;
+            will-change: transform;
+        }
+        .tco-row:hover {
+            background-color: #FFF8F7;
+            transform: scale(1.008);
+        }
+
+        /* ── SVG Architecture Diagram ── */
+        .arch-node {
+            transition: fill 0.4s ease, stroke 0.4s ease, filter 0.4s ease;
+            cursor: default;
+        }
+        .arch-node:hover {
+            filter: drop-shadow(0 0 12px rgba(255, 107, 107, 0.45));
+        }
+        .arch-edge {
+            stroke-dasharray: 6 4;
+            animation: dashFlow 2s linear infinite;
+        }
+        @keyframes dashFlow {
+            to {
+                stroke-dashoffset: -20;
+            }
+        }
+
+        /* ── Scroll Reveal ── */
+        .reveal {
+            opacity: 0;
+            transform: translateY(28px);
+            transition: opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+                transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: opacity, transform;
+        }
+        .reveal.revealed {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ── Mobile tweaks ── */
+        @media (max-width: 768px) {
+            .glow-orb {
+                filter: blur(40px);
+            }
+            .card-premium {
+                border-radius: 16px;
+            }
+            .card-premium:hover {
+                transform: none;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+            }
+            .card-premium.card--active {
+                transform: none;
+            }
+            .card-premium:active {
+                transform: scale(0.985);
+                transition: transform 0.15s ease;
+            }
+            .detail-panel.expanded {
+                max-height: 3200px;
+            }
+        }
+        @media (max-width: 480px) {
+            .detail-panel.expanded {
+                max-height: 4200px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-[#F9F8F7] text-[#1A1A1A] antialiased">
+
+    <!-- ════════════════ GLOW ORBS (Background) ════════════════ -->
+    <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div class="glow-orb glow-orb--peach visible" style="width:520px;height:520px;top:-120px;left:-100px;"></div>
+        <div class="glow-orb glow-orb--salmon visible" style="width:400px;height:400px;top:35%;right:-80px;"></div>
+        <div class="glow-orb glow-orb--warm visible" style="width:340px;height:340px;bottom:-80px;left:28%;"></div>
+    </div>
+
+    <!-- ════════════════ MAIN CONTENT ════════════════ -->
+    <main class="relative z-10 max-w-6xl mx-auto px-5 sm:px-8 lg:px-10 pt-10 pb-24">
+
+        <!-- ── NAV ── -->
+        <nav class="flex items-center justify-between mb-16 reveal">
+            <div class="flex items-center gap-3">
+                <span class="pulse-dot"></span>
+                <span class="text-sm font-semibold tracking-wide uppercase text-ink-muted">Anthropic • Q3 2026 Audit</span>
+            </div>
+            <div class="hidden sm:flex gap-6 text-sm font-medium text-ink-muted">
+                <a href="#benchmarks" class="hover:text-ink transition-colors duration-300">Benchmarks</a>
+                <a href="#tco" class="hover:text-ink transition-colors duration-300">TCO</a>
+                <a href="#tokenizer" class="hover:text-ink transition-colors duration-300">Tokenizer</a>
+                <a href="#safety" class="hover:text-ink transition-colors duration-300">Safety</a>
+            </div>
+        </nav>
+
+        <!-- ── HERO ── -->
+        <header class="mb-20 reveal">
+            <p class="text-xs font-semibold tracking-[0.2em] uppercase text-glow-start mb-4">Infrastructure Audit & Performance TCO Report</p>
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.05] tracking-tight text-ink max-w-4xl">
+                Claude Sonnet&nbsp;5<span class="text-glow-start">,</span> Sonnet&nbsp;4.6<span class="text-glow-start">,</span>
+                <br class="hidden sm:block" />&amp; Opus&nbsp;4.8
+            </h1>
+            <p class="text-lg sm:text-xl text-ink-muted mt-6 max-w-2xl leading-relaxed">
+                A structural paradigm shift in LLM deployment — Adaptive Thinking, Tokenizer Inflation, and native Context Compaction redefine the performance-to-cost curve for enterprise infrastructure teams.
+            </p>
+            <div class="flex flex-wrap gap-3 mt-8">
+                <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-gray-100 text-xs font-semibold text-ink-muted shadow-sm">📅 Published July 2026</span>
+                <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-gray-100 text-xs font-semibold text-ink-muted shadow-sm">🔬 Verified Benchmarks Only</span>
+                <span class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-gray-100 text-xs font-semibold text-ink-muted shadow-sm">🏗️ Enterprise Routing Ready</span>
+            </div>
+        </header>
+
+        <!-- ════════════════ MODEL CARDS ════════════════ -->
+        <section class="mb-20 reveal" id="models">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-2 text-ink">Model Tier Comparison</h2>
+            <p class="text-sm text-ink-muted mb-8">Click any card to expand detailed technical analysis.</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+
+                <!-- Card: Sonnet 4.6 -->
+                <article class="card-premium p-6 sm:p-7 group" data-model="sonnet46" role="button" tabindex="0" aria-expanded="false">
+                    <div class="card-glow-line"></div>
+                    <span class="text-xs font-semibold tracking-widest uppercase text-ink-faint mb-3 block">Legacy Baseline</span>
+                    <h3 class="text-xl sm:text-2xl font-bold text-ink mb-1">Claude Sonnet 4.6</h3>
+                    <p class="text-sm text-ink-muted mb-4">Stateless generation • Manual thinking budgets</p>
+                    <div class="flex items-baseline gap-2 mb-5">
+                        <span class="text-3xl font-black text-ink">$3</span><span class="text-sm text-ink-muted">/ 1M input</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-2.5 py-1 rounded-md bg-gray-100 text-xs font-medium text-ink-muted">Fixed Budget</span>
+                        <span class="px-2.5 py-1 rounded-md bg-gray-100 text-xs font-medium text-ink-muted">Legacy Tokenizer</span>
+                    </div>
+                    <!-- Expandable detail -->
+                    <div class="detail-panel mt-4 border-t border-gray-100 pt-4" data-panel="sonnet46">
+                        <p class="text-sm text-ink-muted leading-relaxed mb-3">
+                            <strong>Architecture:</strong> Stateless text generation with manual <code class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">budget_tokens</code> allocation. Bimodal inefficiencies plague this tier — simple lookups burn expensive reasoning tokens while complex tasks fail prematurely under restrictive budgets.
+                        </p>
+                        <p class="text-sm text-ink-muted leading-relaxed mb-3">
+                            <strong>Tokenizer:</strong> Legacy mapping with <em>T<sub>f</sub> = 1.0×</em> baseline. No inflation overhead, but also lacks the improved text/code representation of the updated tokenizer.
+                        </p>
+                        <p class="text-sm text-ink-muted leading-relaxed">
+                            <strong>Best For:</strong> Cost-sensitive stateless workloads, legacy pipeline compatibility, and teams not yet migrated to Adaptive Thinking.
+                        </p>
+                    </div>
+                    <button class="expand-toggle mt-4 text-xs font-semibold text-glow-start hover:text-[#e55a5a] transition-colors duration-300 flex items-center gap-1" data-target="sonnet46">
+                        <span class="toggle-label">Show Details</span>
+                        <svg class="w-3 h-3 toggle-chevron transition-transform duration-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                </article>
+
+                <!-- Card: Sonnet 5 -->
+                <article class="card-premium p-6 sm:p-7 group ring-1 ring-glow-start/20" data-model="sonnet5" role="button" tabindex="0" aria-expanded="false">
+                    <div class="card-glow-line"></div>
+                    <span class="text-xs font-semibold tracking-widest uppercase text-glow-start mb-3 block">🌟 Current Standard</span>
+                    <h3 class="text-xl sm:text-2xl font-bold text-ink mb-1">Claude Sonnet 5</h3>
+                    <p class="text-sm text-ink-muted mb-4">Adaptive Thinking • Native Context Compaction</p>
+                    <div class="flex items-baseline gap-2 mb-5">
+                        <span class="text-3xl font-black text-ink">$2</span><span class="text-sm text-ink-muted">/ 1M input <span class="text-glow-start font-semibold">(Intro)</span></span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-2.5 py-1 rounded-md bg-[#FFF0EE] text-xs font-medium text-glow-start">Adaptive Thinking</span>
+                        <span class="px-2.5 py-1 rounded-md bg-[#FFF0EE] text-xs font-medium text-glow-start">New Tokenizer</span>
+                        <span class="px-2.5 py-1 rounded-md bg-[#FFF0EE] text-xs font-medium text-glow-start">Context Compaction</span>
+                    </div>
+                    <div class="detail-panel mt-4 border-t border-gray-100 pt-4" data-panel="sonnet5">
+                        <p class="text-sm text-ink-muted leading-relaxed mb-3">
+                            <strong>Architecture:</strong> Stateful, self-correcting execution engine with <em>Adaptive Thinking</em>. Dynamically self-regulates reasoning compute per-request. Uses <code class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">effort</code> parameter (low/medium/high/xhigh/max) instead of fixed budgets.
+                        </p>
+                        <p class="text-sm text-ink-muted leading-relaxed mb-3">
+                            <strong>Interleaved Thinking:</strong> Executes reasoning blocks <em>between</em> tool calls, evaluates intermediate results, and adjusts plans dynamically. High-effort settings can trigger self-correction loops — monitor token counts carefully.
+                        </p>
+                        <p class="text-sm text-ink-muted leading-relaxed mb-3">
+                            <strong>Tokenizer:</strong> Updated tokenizer with <em>T<sub>f</sub> ≈ 1.27–1.42×</em>. ~30% less text fits in the 1M context window vs. Sonnet 4.6. Recalibrate prompt templates and context-trimming logic.
+                        </p>
+                        <p class="text-sm text-ink-muted leading-relaxed">
+                            <strong>Best For:</strong> Terminal automation (80.4% on Terminal-Bench 2.1), everyday coding, structured extraction, spreadsheet analysis. ~60% of Opus 4.8 cost at comparable performance on standard tasks.
+                        </p>
+                    </div>
+                    <button class="expand-toggle mt-4 text-xs font-semibold text-glow-start hover:text-[#e55a5a] transition-colors duration-300 flex items-center gap-1" data-target="sonnet5">
+                        <span class="toggle-label">Show Details</span>
+                        <svg class="w-3 h-3 toggle-chevron transition-transform duration-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                </article>
+
+                <!-- Card: Opus 4.8 -->
+                <article class="card-premium p-6 sm:p-7 group" data-model="opus48" role="button" tabindex="0" aria-expanded="false">
+                    <div class="card-glow-line"></div>
+                    <span class="text-xs font-semibold tracking-widest uppercase text-ink-faint mb-3 block">🏆 Architectural Leader</span>
+                    <h3 class="text-xl sm:text-2xl font-bold text-ink mb-1">Claude Opus 4.8</h3>
+                    <p class="text-sm text-ink-muted mb-4">Maximum reasoning • Repository-scale engineering</p>
+                    <div class="flex items-baseline gap-2 mb-5">
+                        <span class="text-3xl font-black text-ink">$5</span><span class="text-sm text-ink-muted">/ 1M input</span>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="px-2.5 py-1 rounded-md bg-gray-100 text-xs font-medium text-ink-muted">Adaptive Thinking</span>
+                        <span class="px-2.5 py-1 rounded-md bg-gray-100 text-xs font-medium text-ink-muted">Raw Reasoning Lead</span>
+                    </div>
+                    <div class="detail-panel mt-4 border-t border-gray-100 pt-4" data-panel="opus48">
+                        <p class="text-sm text-ink-muted leading-relaxed mb-3">
+                            <strong>Architecture:</strong> Shares Adaptive Thinking and Context Compaction with Sonnet 5, but with superior raw, unassisted logical reasoning. Clear advantage on HLE No-Tools (49.8% vs 43.2%) and SWE-bench Pro (69.2% vs 63.2%).
+                        </p>
+                        <p class="text-sm text-ink-muted leading-relaxed mb-3">
+                            <strong>Pricing:</strong> $5/$25 per 1M input/output. Premium tier for high-stakes reasoning. Use when Sonnet 5 at xhigh/max would burn excessive reasoning tokens — Opus at default often costs less for complex tasks.
+                        </p>
+                        <p class="text-sm text-ink-muted leading-relaxed">
+                            <strong>Best For:</strong> Repository-scale software engineering, multi-file codebase updates, safety-critical validation, zero-day vulnerability analysis, and research environments demanding maximum unassisted accuracy.
+                        </p>
+                    </div>
+                    <button class="expand-toggle mt-4 text-xs font-semibold text-glow-start hover:text-[#e55a5a] transition-colors duration-300 flex items-center gap-1" data-target="opus48">
+                        <span class="toggle-label">Show Details</span>
+                        <svg class="w-3 h-3 toggle-chevron transition-transform duration-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                </article>
+            </div>
+        </section>
+
+        <!-- ════════════════ BENCHMARKS ════════════════ -->
+        <section class="mb-20 reveal" id="benchmarks">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-2 text-ink">Enterprise Benchmark Evaluation</h2>
+            <p class="text-sm text-ink-muted mb-8">Verified scores only. Bars animate on scroll into view.</p>
+
+            <div class="space-y-8">
+                <!-- SWE-bench Pro -->
+                <div class="bg-white rounded-2xl p-5 sm:p-7 shadow-card border border-gray-100/60">
+                    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                        <h4 class="font-bold text-lg text-ink">SWE-bench Pro</h4>
+                        <span class="text-xs font-semibold text-ink-faint bg-gray-50 px-3 py-1 rounded-full">Brownfield Debugging</span>
+                    </div>
+                    <p class="text-sm text-ink-muted mb-5">Real GitHub issues in actively-maintained complex codebases. Leader: <strong>Opus 4.8 (69.2%)</strong></p>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-ink-muted">Sonnet 4.6</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--sonnet46 h-full rounded-full" style="--target-width:58.1%;width:0" data-width="58.1"></div></div>
+                            <span class="text-sm font-bold w-14 text-ink">58.1%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-glow-start">Sonnet 5</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--sonnet5 h-full rounded-full" style="--target-width:63.2%;width:0" data-width="63.2"></div></div>
+                            <span class="text-sm font-bold w-14 text-glow-start">63.2%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-[#C94A4A]">Opus 4.8</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--opus48 h-full rounded-full" style="--target-width:69.2%;width:0" data-width="69.2"></div></div>
+                            <span class="text-sm font-bold w-14 text-[#C94A4A]">69.2%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Terminal-Bench 2.1 -->
+                <div class="bg-white rounded-2xl p-5 sm:p-7 shadow-card border border-gray-100/60">
+                    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                        <h4 class="font-bold text-lg text-ink">Terminal-Bench 2.1</h4>
+                        <span class="text-xs font-semibold text-ink-faint bg-gray-50 px-3 py-1 rounded-full">Sandboxed Shell Autonomy</span>
+                    </div>
+                    <p class="text-sm text-ink-muted mb-5">Terminal command execution and system state management. Leader: <strong>Sonnet 5 (80.4%)</strong> — 13.4pt gain over Sonnet 4.6</p>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-ink-muted">Sonnet 4.6</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--sonnet46 h-full rounded-full" style="--target-width:67.0%;width:0" data-width="67.0"></div></div>
+                            <span class="text-sm font-bold w-14 text-ink">67.0%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-glow-start">Sonnet 5</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--sonnet5 h-full rounded-full" style="--target-width:80.4%;width:0" data-width="80.4"></div></div>
+                            <span class="text-sm font-bold w-14 text-glow-start">80.4%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-[#C94A4A]">Opus 4.8</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--opus48 h-full rounded-full" style="--target-width:74.6%;width:0" data-width="74.6"></div></div>
+                            <span class="text-sm font-bold w-14 text-[#C94A4A]">74.6%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OSWorld-Verified -->
+                <div class="bg-white rounded-2xl p-5 sm:p-7 shadow-card border border-gray-100/60">
+                    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                        <h4 class="font-bold text-lg text-ink">OSWorld-Verified</h4>
+                        <span class="text-xs font-semibold text-ink-faint bg-gray-50 px-3 py-1 rounded-full">OS-Level Agent Tasks</span>
+                    </div>
+                    <p class="text-sm text-ink-muted mb-5">Leader: <strong>Opus 4.8 (83.4%)</strong></p>
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-ink-muted">Sonnet 4.6</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--sonnet46 h-full rounded-full" style="--target-width:78.5%;width:0" data-width="78.5"></div></div>
+                            <span class="text-sm font-bold w-14 text-ink">78.5%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-glow-start">Sonnet 5</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--sonnet5 h-full rounded-full" style="--target-width:81.2%;width:0" data-width="81.2"></div></div>
+                            <span class="text-sm font-bold w-14 text-glow-start">81.2%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-semibold w-24 text-right text-[#C94A4A]">Opus 4.8</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden"><div class="benchmark-bar bar--opus48 h-full rounded-full" style="--target-width:83.4%;width:0" data-width="83.4"></div></div>
+                            <span class="text-sm font-bold w-14 text-[#C94A4A]">83.4%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HLE -->
+                <div class="bg-white rounded-2xl p-5 sm:p-7 shadow-card border border-gray-100/60">
+                    <h4 class="font-bold text-lg text-ink mb-3">Humanity's Last Exam (HLE)</h4>
+                    <p class="text-sm text-ink-muted mb-5">Graduate-level multidisciplinary reasoning. <strong>With Tools:</strong> Sonnet 5 (57.4%) near-parity with Opus 4.8 (57.9%). <strong>No Tools:</strong> Opus 4.8 leads at 49.8% vs Sonnet 5's 43.2% — raw reasoning gap widens without external computation.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                            <span class="text-xs font-semibold text-ink-faint uppercase tracking-wide">With Tools</span>
+                            <div class="space-y-3 mt-3">
+                                <div class="flex items-center gap-2"><span class="w-20 text-xs text-ink-muted">Sonnet 4.6</span><div class="flex-1 bg-gray-100 h-2 rounded-full"><div class="benchmark-bar bar--sonnet46 h-full rounded-full" style="--target-width:46.8%;width:0" data-width="46.8"></div></div><span class="text-xs font-bold">46.8%</span></div>
+                                <div class="flex items-center gap-2"><span class="w-20 text-xs text-glow-start font-semibold">Sonnet 5</span><div class="flex-1 bg-gray-100 h-2 rounded-full"><div class="benchmark-bar bar--sonnet5 h-full rounded-full" style="--target-width:57.4%;width:0" data-width="57.4"></div></div><span class="text-xs font-bold text-glow-start">57.4%</span></div>
+                                <div class="flex items-center gap-2"><span class="w-20 text-xs text-[#C94A4A] font-semibold">Opus 4.8</span><div class="flex-1 bg-gray-100 h-2 rounded-full"><div class="benchmark-bar bar--opus48 h-full rounded-full" style="--target-width:57.9%;width:0" data-width="57.9"></div></div><span class="text-xs font-bold text-[#C94A4A]">57.9%</span></div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-xs font-semibold text-ink-faint uppercase tracking-wide">No Tools</span>
+                            <div class="space-y-3 mt-3">
+                                <div class="flex items-center gap-2"><span class="w-20 text-xs text-ink-muted">Sonnet 4.6</span><div class="flex-1 bg-gray-100 h-2 rounded-full"><div class="benchmark-bar bar--sonnet46 h-full rounded-full" style="--target-width:34.6%;width:0" data-width="34.6"></div></div><span class="text-xs font-bold">34.6%</span></div>
+                                <div class="flex items-center gap-2"><span class="w-20 text-xs text-glow-start font-semibold">Sonnet 5</span><div class="flex-1 bg-gray-100 h-2 rounded-full"><div class="benchmark-bar bar--sonnet5 h-full rounded-full" style="--target-width:43.2%;width:0" data-width="43.2"></div></div><span class="text-xs font-bold text-glow-start">43.2%</span></div>
+                                <div class="flex items-center gap-2"><span class="w-20 text-xs text-[#C94A4A] font-semibold">Opus 4.8</span><div class="flex-1 bg-gray-100 h-2 rounded-full"><div class="benchmark-bar bar--opus48 h-full rounded-full" style="--target-width:49.8%;width:0" data-width="49.8"></div></div><span class="text-xs font-bold text-[#C94A4A]">49.8%</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ════════════════ TCO & PRICING ════════════════ -->
+        <section class="mb-20 reveal" id="tco">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-2 text-ink">Total Cost of Ownership (TCO)</h2>
+            <p class="text-sm text-ink-muted mb-8">12-turn agent simulation: 8,000-word system prefix, 2,000 words/turn input, 1,000 words/turn output. <strong>Tokenizer Inflation raises Sonnet 5's standard uncached cost by exactly 30.0%.</strong></p>
+
+            <!-- Pricing Table -->
+            <div class="bg-white rounded-2xl shadow-card border border-gray-100/60 overflow-x-auto mb-8">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50/60 border-b border-gray-100">
+                        <tr>
+                            <th class="text-left px-5 py-4 font-semibold text-ink">Model</th>
+                            <th class="text-right px-5 py-4 font-semibold text-ink">Input / 1M</th>
+                            <th class="text-right px-5 py-4 font-semibold text-ink">Output / 1M</th>
+                            <th class="text-right px-5 py-4 font-semibold text-ink">Cache Write</th>
+                            <th class="text-right px-5 py-4 font-semibold text-ink">Cache Read</th>
+                            <th class="text-right px-5 py-4 font-semibold text-ink">Batch Discount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="tco-row border-b border-gray-50">
+                            <td class="px-5 py-4 font-medium text-ink">Sonnet 4.6</td>
+                            <td class="px-5 py-4 text-right">$3.00</td>
+                            <td class="px-5 py-4 text-right">$15.00</td>
+                            <td class="px-5 py-4 text-right">1.25×</td>
+                            <td class="px-5 py-4 text-right font-semibold text-green-600">0.10× (90% off)</td>
+                            <td class="px-5 py-4 text-right">50%</td>
+                        </tr>
+                        <tr class="tco-row border-b border-gray-50 bg-[#FFFBFB]">
+                            <td class="px-5 py-4 font-medium text-glow-start">Sonnet 5 (Intro)*</td>
+                            <td class="px-5 py-4 text-right font-bold text-glow-start">$2.00</td>
+                            <td class="px-5 py-4 text-right font-bold text-glow-start">$10.00</td>
+                            <td class="px-5 py-4 text-right">1.25×</td>
+                            <td class="px-5 py-4 text-right font-semibold text-green-600">0.10× (90% off)</td>
+                            <td class="px-5 py-4 text-right">50%</td>
+                        </tr>
+                        <tr class="tco-row border-b border-gray-50">
+                            <td class="px-5 py-4 font-medium text-ink">Sonnet 5 (Std)</td>
+                            <td class="px-5 py-4 text-right">$3.00</td>
+                            <td class="px-5 py-4 text-right">$15.00</td>
+                            <td class="px-5 py-4 text-right">1.25×</td>
+                            <td class="px-5 py-4 text-right font-semibold text-green-600">0.10× (90% off)</td>
+                            <td class="px-5 py-4 text-right">50%</td>
+                        </tr>
+                        <tr class="tco-row">
+                            <td class="px-5 py-4 font-medium text-[#C94A4A]">Opus 4.8</td>
+                            <td class="px-5 py-4 text-right font-bold">$5.00</td>
+                            <td class="px-5 py-4 text-right font-bold">$25.00</td>
+                            <td class="px-5 py-4 text-right">1.25×</td>
+                            <td class="px-5 py-4 text-right font-semibold text-green-600">0.10× (90% off)</td>
+                            <td class="px-5 py-4 text-right">50%</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="px-5 py-3 text-xs text-ink-faint">*Introductory pricing active through August 31, 2026. US-only endpoints apply a flat 1.1× multiplier.</p>
+            </div>
+
+            <!-- TCO Simulation Results -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white rounded-xl p-5 shadow-card border border-gray-100/60 text-center">
+                    <p class="text-xs font-semibold text-ink-faint uppercase mb-1">Sonnet 4.6 Uncached</p>
+                    <p class="text-3xl font-black text-ink">$1.13</p>
+                    <p class="text-xs text-ink-muted mt-1">per 12-turn session</p>
+                </div>
+                <div class="bg-[#FFFBFB] rounded-xl p-5 shadow-card border border-glow-start/15 text-center ring-1 ring-glow-start/10">
+                    <p class="text-xs font-semibold text-glow-start uppercase mb-1">Sonnet 5 Intro Uncached</p>
+                    <p class="text-3xl font-black text-glow-start">$0.98</p>
+                    <p class="text-xs text-ink-muted mt-1">30% cheaper than 4.6</p>
+                </div>
+                <div class="bg-white rounded-xl p-5 shadow-card border border-gray-100/60 text-center">
+                    <p class="text-xs font-semibold text-ink-faint uppercase mb-1">Sonnet 5 Std Uncached</p>
+                    <p class="text-3xl font-black text-ink">$1.47</p>
+                    <p class="text-xs text-ink-muted mt-1">30% more than 4.6</p>
+                </div>
+                <div class="bg-white rounded-xl p-5 shadow-card border border-gray-100/60 text-center">
+                    <p class="text-xs font-semibold text-ink-faint uppercase mb-1">Opus 4.8 Uncached</p>
+                    <p class="text-3xl font-black text-[#C94A4A]">$2.46</p>
+                    <p class="text-xs text-ink-muted mt-1">premium reasoning tier</p>
+                </div>
+            </div>
+            <p class="text-xs text-ink-muted mt-4 text-center">
+                <strong>Cached sessions:</strong> All models achieve ~67.6% savings. Caching is the single most effective TCO optimization.
+            </p>
+        </section>
+
+        <!-- ════════════════ TOKENIZER INFLATION ════════════════ -->
+        <section class="mb-20 reveal" id="tokenizer">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-2 text-ink">Tokenizer Inflation Impact</h2>
+            <p class="text-sm text-ink-muted mb-8">The updated tokenizer (standardized in Sonnet 5 / Opus 4.8) generates more tokens on identical strings. <em>T<sub>f</sub></em> = token count multiplier vs. legacy tokenizer.</p>
+
+            <div class="bg-white rounded-2xl p-5 sm:p-7 shadow-card border border-gray-100/60">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div class="text-center p-4">
+                        <p class="text-xs font-semibold text-ink-faint uppercase mb-2">English Prose</p>
+                        <p class="text-4xl font-black text-glow-start">1.42<span class="text-lg">×</span></p>
+                        <p class="text-xs text-ink-muted mt-1">+42.0% overhead</p>
+                        <div class="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full rounded-full bg-glow-start" style="width:42%"></div></div>
+                    </div>
+                    <div class="text-center p-4">
+                        <p class="text-xs font-semibold text-ink-faint uppercase mb-2">Spanish Text</p>
+                        <p class="text-4xl font-black text-[#E87A5D]">1.33<span class="text-lg">×</span></p>
+                        <p class="text-xs text-ink-muted mt-1">+33.0% overhead</p>
+                        <div class="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full rounded-full bg-[#E87A5D]" style="width:33%"></div></div>
+                    </div>
+                    <div class="text-center p-4">
+                        <p class="text-xs font-semibold text-ink-faint uppercase mb-2">Python Code</p>
+                        <p class="text-4xl font-black text-[#D4956B]">1.27<span class="text-lg">×</span></p>
+                        <p class="text-xs text-ink-muted mt-1">+27.5% overhead</p>
+                        <div class="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full rounded-full bg-[#D4956B]" style="width:27.5%"></div></div>
+                    </div>
+                    <div class="text-center p-4">
+                        <p class="text-xs font-semibold text-ink-faint uppercase mb-2">Simplified Chinese</p>
+                        <p class="text-4xl font-black text-green-600">1.01<span class="text-lg">×</span></p>
+                        <p class="text-xs text-ink-muted mt-1">+1.0% (flat)</p>
+                        <div class="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden"><div class="h-full rounded-full bg-green-500" style="width:1%"></div></div>
+                    </div>
+                </div>
+                <div class="mt-6 p-4 bg-[#FFF8F7] rounded-xl border border-glow-start/10">
+                    <p class="text-sm font-semibold text-ink mb-1">⚠️ Critical Implication</p>
+                    <p class="text-sm text-ink-muted">A 1M-token context window holds ~30% less text under the new tokenizer. Prompt templates, context-trimming logic, and cache thresholds <strong>must be recalibrated</strong> when migrating from Sonnet 4.6 to Sonnet 5 or Opus 4.8.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ════════════════ ARCHITECTURE ROUTING DIAGRAM ════════════════ -->
+        <section class="mb-20 reveal">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-2 text-ink">Technical Routing Architecture</h2>
+            <p class="text-sm text-ink-muted mb-8">Dynamic multi-tier routing with caching, complexity classification, and real-time safety auditing.</p>
+            <div class="bg-white rounded-2xl p-4 sm:p-7 shadow-card border border-gray-100/60 overflow-x-auto">
+                <svg viewBox="0 0 820 620" class="w-full max-w-3xl mx-auto" style="min-width:600px" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Incoming Request -->
+                    <rect x="310" y="10" width="200" height="44" rx="10" fill="#1A1A1A" class="arch-node"/>
+                    <text x="410" y="38" text-anchor="middle" fill="white" font-size="13" font-weight="700" font-family="Inter,sans-serif">Incoming API Request</text>
+                    <line x1="410" y1="54" x2="410" y2="82" stroke="#1A1A1A" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Token Size Eval -->
+                    <rect x="285" y="85" width="250" height="40" rx="8" fill="#F4F2F0" stroke="#D4D4D4" stroke-width="1.5" class="arch-node"/>
+                    <text x="410" y="110" text-anchor="middle" fill="#1A1A1A" font-size="12" font-weight="600" font-family="Inter,sans-serif">Token Size Evaluation</text>
+                    <line x1="410" y1="125" x2="410" y2="155" stroke="#1A1A1A" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <text x="540" y="108" fill="#9E9E9E" font-size="10" font-family="Inter,sans-serif">≥ 1,024 tokens? → Yes</text>
+
+                    <!-- Cache Matching -->
+                    <rect x="270" y="158" width="280" height="40" rx="8" fill="#FFF0EE" stroke="#FF8E8E" stroke-width="2" class="arch-node"/>
+                    <text x="410" y="183" text-anchor="middle" fill="#1A1A1A" font-size="12" font-weight="600" font-family="Inter,sans-serif">System Prefix Cache Matching</text>
+
+                    <!-- Cache Hit / Miss branches -->
+                    <line x1="360" y1="198" x2="280" y2="240" stroke="#22C55E" stroke-width="2" marker-end="url(#arrowhead-green)"/>
+                    <text x="240" y="228" fill="#22C55E" font-size="10" font-weight="600" font-family="Inter,sans-serif">Cache Hit (0.1×)</text>
+                    <rect x="200" y="244" width="160" height="36" rx="7" fill="#F0FDF4" stroke="#22C55E" stroke-width="1.5" class="arch-node"/>
+                    <text x="280" y="267" text-anchor="middle" fill="#166534" font-size="11" font-weight="600" font-family="Inter,sans-serif">Read system/tools</text>
+
+                    <line x1="460" y1="198" x2="540" y2="240" stroke="#F59E0B" stroke-width="2" marker-end="url(#arrowhead-amber)"/>
+                    <text x="580" y="228" fill="#F59E0B" font-size="10" font-weight="600" font-family="Inter,sans-serif">Cache Miss</text>
+                    <rect x="500" y="244" width="180" height="36" rx="7" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1.5" class="arch-node"/>
+                    <text x="590" y="267" text-anchor="middle" fill="#92400E" font-size="11" font-weight="600" font-family="Inter,sans-serif">Write Cache (1.25×/2.0×)</text>
+
+                    <!-- Merge point -->
+                    <line x1="280" y1="280" x2="280" y2="310" stroke="#1A1A1A" stroke-width="1.5"/>
+                    <line x1="590" y1="280" x2="590" y2="310" stroke="#1A1A1A" stroke-width="1.5"/>
+                    <line x1="280" y1="310" x2="590" y2="310" stroke="#1A1A1A" stroke-width="1.5"/>
+                    <line x1="410" y1="310" x2="410" y2="340" stroke="#1A1A1A" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Complexity Router -->
+                    <rect x="255" y="343" width="310" height="40" rx="8" fill="#1A1A1A" class="arch-node"/>
+                    <text x="410" y="368" text-anchor="middle" fill="white" font-size="12" font-weight="700" font-family="Inter,sans-serif">Complexity Routing Classifier</text>
+
+                    <!-- Three branches -->
+                    <line x1="330" y1="383" x2="200" y2="430" stroke="#1A1A1A" stroke-width="1.8" marker-end="url(#arrowhead)"/>
+                    <line x1="410" y1="383" x2="410" y2="430" stroke="#1A1A1A" stroke-width="1.8" marker-end="url(#arrowhead)"/>
+                    <line x1="490" y1="383" x2="620" y2="430" stroke="#1A1A1A" stroke-width="1.8" marker-end="url(#arrowhead)"/>
+
+                    <!-- Haiku -->
+                    <rect x="110" y="434" width="170" height="48" rx="9" fill="#F9F8F7" stroke="#B0B0B0" stroke-width="1.5" class="arch-node"/>
+                    <text x="195" y="456" text-anchor="middle" fill="#1A1A1A" font-size="12" font-weight="700" font-family="Inter,sans-serif">Haiku 4.5</text>
+                    <text x="195" y="474" text-anchor="middle" fill="#9E9E9E" font-size="10" font-family="Inter,sans-serif">Effort: Disabled</text>
+                    <text x="195" y="500" text-anchor="middle" fill="#9E9E9E" font-size="9" font-family="Inter,sans-serif">Trivial / Low</text>
+
+                    <!-- Sonnet 5 -->
+                    <rect x="315" y="434" width="190" height="48" rx="9" fill="#FFF0EE" stroke="#FF6B6B" stroke-width="2.5" class="arch-node"/>
+                    <text x="410" y="456" text-anchor="middle" fill="#1A1A1A" font-size="12" font-weight="700" font-family="Inter,sans-serif">Sonnet 5</text>
+                    <text x="410" y="474" text-anchor="middle" fill="#C94A4A" font-size="10" font-family="Inter,sans-serif">Effort: Medium/High</text>
+                    <text x="410" y="500" text-anchor="middle" fill="#C94A4A" font-size="9" font-family="Inter,sans-serif">Standard</text>
+
+                    <!-- Opus -->
+                    <rect x="535" y="434" width="190" height="48" rx="9" fill="#FEF2F2" stroke="#C94A4A" stroke-width="2.5" class="arch-node"/>
+                    <text x="630" y="456" text-anchor="middle" fill="#1A1A1A" font-size="12" font-weight="700" font-family="Inter,sans-serif">Opus 4.8</text>
+                    <text x="630" y="474" text-anchor="middle" fill="#991B1B" font-size="10" font-family="Inter,sans-serif">Effort: High/Max</text>
+                    <text x="630" y="500" text-anchor="middle" fill="#991B1B" font-size="9" font-family="Inter,sans-serif">Complex / Edge</text>
+
+                    <!-- Merge to Safety -->
+                    <line x1="195" y1="500" x2="195" y2="535" stroke="#1A1A1A" stroke-width="1.2"/>
+                    <line x1="410" y1="500" x2="410" y2="535" stroke="#1A1A1A" stroke-width="1.2"/>
+                    <line x1="630" y1="500" x2="630" y2="535" stroke="#1A1A1A" stroke-width="1.2"/>
+                    <line x1="195" y1="535" x2="630" y2="535" stroke="#1A1A1A" stroke-width="1.5"/>
+                    <line x1="410" y1="535" x2="410" y2="555" stroke="#1A1A1A" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Safety Audit -->
+                    <rect x="270" y="558" width="280" height="40" rx="8" fill="#1A1A1A" class="arch-node"/>
+                    <text x="410" y="583" text-anchor="middle" fill="white" font-size="12" font-weight="700" font-family="Inter,sans-serif">Real-Time Safety Audit</text>
+
+                    <!-- Arrowheads -->
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#1A1A1A"/>
+                        </marker>
+                        <marker id="arrowhead-green" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#22C55E"/>
+                        </marker>
+                        <marker id="arrowhead-amber" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#F59E0B"/>
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+        </section>
+
+        <!-- ════════════════ SAFETY ════════════════ -->
+        <section class="mb-20 reveal" id="safety">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-2 text-ink">Safety Safeguards & Refusal Rates</h2>
+            <p class="text-sm text-ink-muted mb-8">Real-time cybersecurity safeguards, over-refusal probabilities, and prompt injection robustness.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Cybersecurity -->
+                <div class="bg-white rounded-2xl p-6 shadow-card border border-gray-100/60">
+                    <div class="pulse-dot mb-4"></div>
+                    <h4 class="font-bold text-lg text-ink mb-2">Active Cybersecurity Safeguards</h4>
+                    <p class="text-sm text-ink-muted mb-3">Sonnet 5 is the <strong>first Sonnet-tier model</strong> with active real-time safeguards by default. Blocked requests return HTTP 200 with <code class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">stop_reason: "refusal"</code>.</p>
+                    <p class="text-xs text-ink-faint">⚠️ Write explicit handlers to avoid silent pipeline failures.</p>
+                </div>
+
+                <!-- Over-Refusal -->
+                <div class="bg-white rounded-2xl p-6 shadow-card border border-gray-100/60">
+                    <h4 class="font-bold text-lg text-ink mb-2">Benign Dual-Use Over-Refusal</h4>
+                    <div class="space-y-3 mt-4">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs w-20 text-ink-muted">Sonnet 4.6</span>
+                            <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-gray-300 rounded-full" style="width:20%"></div></div>
+                            <span class="text-xs font-semibold text-green-600">Low FPR</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs w-20 text-glow-start font-semibold">Sonnet 5</span>
+                            <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-glow-start rounded-full" style="width:75%"></div></div>
+                            <span class="text-xs font-semibold text-glow-start">High FPR</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs w-20 text-[#C94A4A] font-semibold">Opus 4.8</span>
+                            <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden"><div class="h-full bg-[#C94A4A] rounded-full" style="width:45%"></div></div>
+                            <span class="text-xs font-semibold text-[#C94A4A]">Moderate FPR</span>
+                        </div>
+                    </div>
+                    <p class="text-xs text-ink-muted mt-4">For authorized security research, use Opus 4.8 or apply to the <strong>Cyber Verification Program</strong>.</p>
+                </div>
+
+                <!-- Prompt Injection -->
+                <div class="bg-white rounded-2xl p-6 shadow-card border border-gray-100/60">
+                    <h4 class="font-bold text-lg text-ink mb-2">Prompt Injection Robustness</h4>
+                    <div class="text-center py-4">
+                        <p class="text-5xl font-black text-glow-start"><span class="counter-value" data-target="1">0</span>%</p>
+                        <p class="text-sm text-ink-muted mt-2">Success rate under Sonnet 5</p>
+                        <p class="text-xs text-ink-faint mt-1">Down from ~50% with Sonnet 4.6</p>
+                    </div>
+                    <p class="text-xs text-ink-muted">Nearly 0% with built-in system-level safeguards. Highly resilient for customer-facing agents.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ════════════════ STRATEGIC ROUTING POLICIES ════════════════ -->
+        <section class="mb-20 reveal">
+            <h2 class="text-2xl sm:text-3xl font-bold mb-2 text-ink">Strategic Routing Policies</h2>
+            <p class="text-sm text-ink-muted mb-8">Multi-tier dynamic routing to optimize performance, cost, and safety across high-volume workloads.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div class="bg-white rounded-2xl p-6 shadow-card border border-gray-100/60 flex gap-4 items-start">
+                    <span class="text-2xl flex-shrink-0">🔧</span>
+                    <div>
+                        <h4 class="font-bold text-ink mb-1">Model Abstraction Layer</h4>
+                        <p class="text-sm text-ink-muted">Never call model APIs directly. Build a thin orchestration layer (Agentic Scaffolding) to standardize inputs, manage retries, handle caching, and structured outputs. Prevents vendor lock-in.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-card border border-gray-100/60 flex gap-4 items-start">
+                    <span class="text-2xl flex-shrink-0">🎯</span>
+                    <div>
+                        <h4 class="font-bold text-ink mb-1">Default: Sonnet 5 @ Medium/High</h4>
+                        <p class="text-sm text-ink-muted">Standard coding, terminal work, spreadsheets, structured extraction. Matches or exceeds Opus 4.8 on everyday tasks at ~60% cost.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-card border border-gray-100/60 flex gap-4 items-start">
+                    <span class="text-2xl flex-shrink-0">🚀</span>
+                    <div>
+                        <h4 class="font-bold text-ink mb-1">Escalate: Opus 4.8</h4>
+                        <p class="text-sm text-ink-muted">Repository-scale issues, multi-file codebase updates, safety-critical validation. Do <em>not</em> run Sonnet 5 at xhigh/max — it can cost more than Opus at default.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl p-6 shadow-card border border-gray-100/60 flex gap-4 items-start">
+                    <span class="text-2xl flex-shrink-0">⚡</span>
+                    <div>
+                        <h4 class="font-bold text-ink mb-1">Route Low-Complexity to Haiku 4.5</h4>
+                        <p class="text-sm text-ink-muted">Trivial classifications, simple formatting, high-frequency low-context tasks. Bypass reasoning models entirely to minimize latency and token consumption.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ════════════════ VERDICT ════════════════ -->
+        <section class="reveal">
+            <div class="bg-[#1A1A1A] rounded-2xl p-7 sm:p-10 text-white relative overflow-hidden">
+                <div class="glow-orb glow-orb--salmon visible" style="width:300px;height:300px;top:-60px;right:-40px;opacity:0.35;position:absolute;"></div>
+                <div class="relative z-10">
+                    <h2 class="text-2xl sm:text-3xl font-bold mb-4 text-white">Architectural Verdict</h2>
+                    <p class="text-base sm:text-lg text-gray-300 leading-relaxed mb-6 max-w-3xl">
+                        These releases represent a <strong class="text-white">structural paradigm shift</strong> — from stateless text generation to stateful, self-correcting execution engines. Fixed-budget reasoning is deprecated. Tokenizer Inflation demands infrastructure-layer caching. Active cybersecurity safeguards are now standard at the Sonnet tier.
+                    </p>
+                    <div class="flex flex-wrap gap-4">
+                        <span class="px-5 py-3 rounded-xl bg-white/10 text-sm font-semibold text-white backdrop-blur-sm">Adaptive Thinking = New Default</span>
+                        <span class="px-5 py-3 rounded-xl bg-white/10 text-sm font-semibold text-white backdrop-blur-sm">Cache or Pay +30%</span>
+                        <span class="px-5 py-3 rounded-xl bg-white/10 text-sm font-semibold text-white backdrop-blur-sm">Sonnet 5 for Terminal Automation</span>
+                        <span class="px-5 py-3 rounded-xl bg-white/10 text-sm font-semibold text-white backdrop-blur-sm">Opus 4.8 for Repository-Scale</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="mt-20 pt-10 border-t border-gray-200 reveal text-center">
+            <p class="text-xs text-ink-faint">Infrastructure Audit & Performance TCO Report • Published July 2026 • Data sourced from verified benchmarks and Anthropic Platform API documentation.</p>
+            <p class="text-xs text-ink-faint mt-1">Claude Sonnet 5, Claude Sonnet 4.6, and Claude Opus 4.8 are products of Anthropic. All pricing and benchmark data subject to change.</p>
+        </footer>
+    </main>
+
+    <!-- ════════════════ JAVASCRIPT ════════════════ -->
+    <script>
+        (function() {
+            // ── Spring Animation Utility ──
+            function spring({ from, to, stiffness = 280, damping = 28, mass = 0.8, onUpdate, onComplete }) {
+                let value = from;
+                let velocity = 0;
+                const target = to;
+                let frameId;
+                const precision = 0.001;
+
+                function step() {
+                    const force = (target - value) * stiffness;
+                    const acceleration = force / mass;
+                    velocity = (velocity + acceleration) * (1 - damping / 100);
+                    value += velocity;
+                    onUpdate(value);
+                    if (Math.abs(target - value) < precision && Math.abs(velocity) < precision) {
+                        onUpdate(target);
+                        if (onComplete) onComplete();
+                        return;
+                    }
+                    frameId = requestAnimationFrame(step);
+                }
+                frameId = requestAnimationFrame(step);
+                return {
+                    cancel: () => { if (frameId) cancelAnimationFrame(frameId); },
+                    setTarget: (newTarget) => { /* can extend */ }
+                };
+            }
+
+            // ── Expandable Card Toggle ──
+            const expandToggles = document.querySelectorAll('.expand-toggle');
+            expandToggles.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const target = btn.dataset.target;
+                    const card = btn.closest('.card-premium');
+                    const panel = card.querySelector(`[data-panel="${target}"]`);
+                    const label = btn.querySelector('.toggle-label');
+                    const chevron = btn.querySelector('.toggle-chevron');
+
+                    const isExpanded = panel.classList.contains('expanded');
+                    if (isExpanded) {
+                        panel.classList.remove('expanded');
+                        card.classList.remove('card--active');
+                        card.setAttribute('aria-expanded', 'false');
+                        label.textContent = 'Show Details';
+                        chevron.style.transform = 'rotate(0deg)';
+                    } else {
+                        panel.classList.add('expanded');
+                        card.classList.add('card--active');
+                        card.setAttribute('aria-expanded', 'true');
+                        label.textContent = 'Hide Details';
+                        chevron.style.transform = 'rotate(180deg)';
+                    }
+                });
+            });
+
+            // Also toggle when clicking the card itself (but not on buttons/links inside)
+            document.querySelectorAll('.card-premium').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('code'))
+                        return;
+                    const toggleBtn = card.querySelector('.expand-toggle');
+                    if (toggleBtn) toggleBtn.click();
+                });
+                // Keyboard support
+                card.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        const toggleBtn = card.querySelector('.expand-toggle');
+                        if (toggleBtn) toggleBtn.click();
+                    }
+                });
+            });
+
+            // ── 3D Tilt on Desktop ──
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (!isMobile) {
+                document.querySelectorAll('.card-premium').forEach(card => {
+                    card.addEventListener('mousemove', (e) => {
+                        const rect = card.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+                        const centerX = rect.width / 2;
+                        const centerY = rect.height / 2;
+                        const rotateX = ((y - centerY) / centerY) * -3;
+                        const rotateY = ((x - centerX) / centerX) * 3;
+                        card.style.transform =
+                            `perspective(800px) translateY(-2px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                    });
+                    card.addEventListener('mouseleave', () => {
+                        card.style.transform =
+                            'perspective(800px) translateY(0px) rotateX(0deg) rotateY(0deg)';
+                    });
+                });
+            }
+
+            // ── Scroll-Triggered Bar Animations ──
+            const barObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const bars = entry.target.querySelectorAll('.benchmark-bar');
+                        bars.forEach(bar => {
+                            const targetWidth = bar.dataset.width;
+                            if (targetWidth) {
+                                bar.style.setProperty('--target-width', targetWidth + '%');
+                                bar.classList.add('animated');
+                                // Re-trigger animation
+                                bar.style.animation = 'none';
+                                bar.offsetHeight;
+                                bar.style.animation = '';
+                                bar.style.width = targetWidth + '%';
+                            }
+                        });
+                        barObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.25 });
+
+            document.querySelectorAll('.benchmark-bar').forEach(bar => {
+                const container = bar.closest('.bg-white.rounded-2xl') || bar.closest('.space-y-4');
+                if (container && !container.dataset.barObserved) {
+                    container.dataset.barObserved = 'true';
+                    barObserver.observe(container);
+                }
+            });
+
+            // ── Scroll Reveal ──
+            const revealObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('revealed');
+                        revealObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+            document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+            // ── Counter Animation ──
+            const counterObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const counter = entry.target;
+                        const targetVal = parseFloat(counter.dataset.target);
+                        if (!isNaN(targetVal) && !counter.dataset.counted) {
+                            counter.dataset.counted = 'true';
+                            let current = 0;
+                            const duration = 1400;
+                            const startTime = performance.now();
+
+                            function updateCounter(now) {
+                                const elapsed = now - startTime;
+                                const progress = Math.min(elapsed / duration, 1);
+                                // Ease-out cubic
+                                const eased = 1 - Math.pow(1 - progress, 3);
+                                current = targetVal * eased;
+                                counter.textContent = Math.round(current);
+                                if (progress < 1) {
+                                    requestAnimationFrame(updateCounter);
+                                } else {
+                                    counter.textContent = targetVal;
+                                }
+                            }
+                            requestAnimationFrame(updateCounter);
+                        }
+                        counterObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.6 });
+
+            document.querySelectorAll('.counter-value').forEach(el => counterObserver.observe(el));
+
+            // ── Initial reveal for above-the-fold elements ──
+            requestAnimationFrame(() => {
+                document.querySelectorAll('.reveal').forEach(el => {
+                    const rect = el.getBoundingClientRect();
+                    if (rect.top < window.innerHeight) {
+                        el.classList.add('revealed');
+                    }
+                });
+            });
+
+            // ── Smooth scroll for nav links ──
+            document.querySelectorAll('a[href^="#"]').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    const targetId = link.getAttribute('href');
+                    if (targetId === '#') return;
+                    const target = document.querySelector(targetId);
+                    if (target) {
+                        e.preventDefault();
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+
+            console.log('%c🚀 Infrastructure Audit Dashboard Ready %c| %cSpring Physics • 60fps • Hardware Accelerated',
+                'font-weight:bold;color:#FF6B6B;',
+                '',
+                'color:#9E9E9E;');
+            console.log('%cModels: Sonnet 4.6 | Sonnet 5 | Opus 4.8 %c— Click cards to expand details.',
+                'font-weight:600;',
+                '');
+        })();
+    </script>
+</body>
+</html>
