@@ -2,8 +2,6 @@
 
 A premium, interactive dashboard comparing **Claude Sonnet 5**, **Claude Sonnet 4.6**, and **Claude Opus 4.8** — built for enterprise infrastructure teams. Features real benchmark data, tokenizer inflation simulation, TCO analysis, and dynamic architectural routing visualization.
 
-![Hero](https://img.shields.io/badge/status-production--ready-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![Vercel](https://img.shields.io/badge/deploy-Vercel-black?logo=vercel)
-
 ---
 
 ## ✨ Features
