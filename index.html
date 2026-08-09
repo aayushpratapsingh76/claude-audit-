@@ -5,53 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Infrastructure Audit & Performance TCO Report — Claude Sonnet 5 vs Sonnet 4.6 vs Opus 4.8</title>
 
-    <!-- Tailwind CSS via CDN -->
-    <script src="https://cdn.tailwindcss.com">
-    </script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'Inter Display', 'SF Pro Display', 'system-ui', 'sans-serif'],
-                        mono: ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],
-                    },
-                    colors: {
-                        glow: {
-                            start: '#FF6B6B',
-                            mid: '#FF8E8E',
-                            end: '#FFB3B3',
-                            soft: '#FFF0EE',
-                        },
-                        canvas: {
-                            DEFAULT: '#F9F8F7',
-                            alt: '#F4F2F0',
-                            card: '#FFFFFF',
-                        },
-                        ink: {
-                            DEFAULT: '#1A1A1A',
-                            muted: '#5C5C5C',
-                            faint: '#9E9E9E',
-                        },
-                    },
-                    boxShadow: {
-                        'card': '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)',
-                        'card-hover': '0 20px 50px rgba(255,107,107,0.10), 0 8px 24px rgba(0,0,0,0.06)',
-                        'card-lift': '0 32px 64px rgba(255,107,107,0.12), 0 12px 32px rgba(0,0,0,0.07)',
-                        'glow-sm': '0 0 40px rgba(255,107,107,0.08)',
-                        'glow-md': '0 0 80px rgba(255,107,107,0.12)',
-                        'glow-lg': '0 0 140px rgba(255,142,142,0.15)',
-                    },
-                },
-            },
-        }
-    </script>
-
-    <!-- Google Fonts: Inter + Inter Display -->
+    <!-- Google Fonts: Inter + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
+    <!-- Pure Native CSS Styling -->
     <style>
         :root {
             --glow-start: #FF6B6B;
@@ -59,9 +18,16 @@
             --glow-end: #FFB3B3;
             --glow-soft: #FFF0EE;
             --canvas: #F9F8F7;
+            --canvas-alt: #F4F2F0;
             --card: #FFFFFF;
             --ink: #1A1A1A;
             --ink-muted: #5C5C5C;
+            --ink-faint: #9E9E9E;
+            --font-sans: 'Inter', 'Inter Display', 'SF Pro Display', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+            --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+            --shadow-card-hover: 0 20px 50px rgba(255,107,107,0.10), 0 8px 24px rgba(0,0,0,0.06);
+            --shadow-card-lift: 0 32px 64px rgba(255,107,107,0.12), 0 12px 32px rgba(0,0,0,0.07);
             --spring-stiffness: 280;
             --spring-damping: 28;
             --spring-mass: 0.8;
@@ -69,6 +35,8 @@
 
         * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -82,11 +50,239 @@
         body {
             background-color: var(--canvas);
             color: var(--ink);
-            font-family: 'Inter', 'Inter Display', 'SF Pro Display', system-ui, sans-serif;
+            font-family: var(--font-sans);
             overflow-x: hidden;
             min-height: 100vh;
             line-height: 1.6;
         }
+
+        /* ── Layout Utilities ── */
+        .flex { display: flex; }
+        .inline-flex { display: inline-flex; }
+        .flex-wrap { flex-wrap: wrap; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .items-baseline { align-items: baseline; }
+        .items-start { align-items: flex-start; }
+        .justify-between { justify-content: space-between; }
+        .justify-center { justify-content: center; }
+        .flex-1 { flex: 1 1 0%; }
+        .flex-shrink-0 { flex-shrink: 0; }
+
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+
+        @media (min-width: 640px) {
+            .sm\:flex { display: flex; }
+            .sm\:block { display: block; }
+            .hidden.sm\:block { display: block !important; }
+            .hidden.sm\:flex { display: flex !important; }
+            .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .sm\:px-8 { padding-left: 2rem; padding-right: 2rem; }
+            .sm\:p-7 { padding: 1.75rem; }
+            .sm\:p-10 { padding: 2.5rem; }
+            .sm\:text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+            .sm\:text-2xl { font-size: 1.5rem; line-height: 2rem; }
+            .sm\:text-5xl { font-size: 3rem; line-height: 1; }
+            .sm\:text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+            .sm\:text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+        }
+
+        @media (min-width: 768px) {
+            .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .md\:text-6xl { font-size: 3.75rem; line-height: 1; }
+        }
+
+        @media (min-width: 1024px) {
+            .lg\:px-10 { padding-left: 2.5rem; padding-right: 2.5rem; }
+            .lg\:gap-8 { gap: 2rem; }
+            .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .lg\:text-7xl { font-size: 4.5rem; line-height: 1; }
+        }
+
+        @media (max-width: 639px) {
+            .hidden { display: none !important; }
+        }
+
+        /* Gaps */
+        .gap-1 { gap: 0.25rem; }
+        .gap-2 { gap: 0.5rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-4 { gap: 1rem; }
+        .gap-5 { gap: 1.25rem; }
+        .gap-6 { gap: 1.5rem; }
+        .gap-8 { gap: 2rem; }
+
+        /* Padding */
+        .p-2 { padding: 0.5rem; }
+        .p-2\.5 { padding: 0.625rem; }
+        .p-3 { padding: 0.75rem; }
+        .p-4 { padding: 1rem; }
+        .p-5 { padding: 1.25rem; }
+        .p-6 { padding: 1.5rem; }
+        .p-7 { padding: 1.75rem; }
+        .px-2\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
+        .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+        .px-4 { padding-left: 1rem; padding-right: 1rem; }
+        .px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+        .py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+        .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+        .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+        .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+        .pt-4 { padding-top: 1rem; }
+        .pt-10 { padding-top: 2.5rem; }
+        .pb-4 { padding-bottom: 1rem; }
+        .pb-24 { padding-bottom: 6rem; }
+
+        /* Margins */
+        .m-0 { margin: 0; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .mb-1 { margin-bottom: 0.25rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-3 { margin-bottom: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-5 { margin-bottom: 1.25rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        .mb-16 { margin-bottom: 4rem; }
+        .mb-20 { margin-bottom: 5rem; }
+        .mt-1 { margin-top: 0.25rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-3 { margin-top: 0.75rem; }
+        .mt-4 { margin-top: 1rem; }
+        .mt-6 { margin-top: 1.5rem; }
+        .mt-8 { margin-top: 2rem; }
+        .mt-20 { margin-top: 5rem; }
+
+        /* Spacing Utilities */
+        .space-y-3 > * + * { margin-top: 0.75rem; }
+        .space-y-4 > * + * { margin-top: 1rem; }
+        .space-y-8 > * + * { margin-top: 2rem; }
+
+        /* Dimensions */
+        .w-full { width: 100%; }
+        .w-3 { width: 0.75rem; }
+        .w-14 { width: 3.5rem; }
+        .w-20 { width: 5rem; }
+        .w-24 { width: 6rem; }
+        .h-full { height: 100%; }
+        .h-2 { height: 0.5rem; }
+        .h-3 { height: 0.75rem; }
+
+        .max-w-2xl { max-width: 42rem; }
+        .max-w-3xl { max-width: 48rem; }
+        .max-w-4xl { max-width: 56rem; }
+        .max-w-6xl { max-width: 72rem; }
+
+        /* Typography */
+        .text-xs { font-size: 0.75rem; line-height: 1rem; }
+        .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+        .text-base { font-size: 1rem; line-height: 1.5rem; }
+        .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+        .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
+        .text-5xl { font-size: 3rem; line-height: 1; }
+
+        .font-medium { font-weight: 500; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .font-black { font-weight: 900; }
+        .font-mono { font-family: var(--font-mono); }
+
+        .tracking-wide { letter-spacing: 0.025em; }
+        .tracking-tight { letter-spacing: -0.025em; }
+        .tracking-widest { letter-spacing: 0.1em; }
+        .uppercase { text-transform: uppercase; }
+        .italic { font-style: italic; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .leading-relaxed { line-height: 1.625; }
+
+        /* Colors */
+        .text-ink { color: var(--ink); }
+        .text-ink-muted { color: var(--ink-muted); }
+        .text-ink-faint { color: var(--ink-faint); }
+        .text-glow-start { color: var(--glow-start); }
+        .text-\[\#C94A4A\] { color: #C94A4A; }
+        .text-\[\#E87A5D\] { color: #E87A5D; }
+        .text-\[\#D4956B\] { color: #D4956B; }
+        .text-\[\#166534\] { color: #166534; }
+        .text-\[\#92400E\] { color: #92400E; }
+        .text-\[\#991B1B\] { color: #991B1B; }
+        .text-green-600 { color: #16a34a; }
+        .text-white { color: #ffffff; }
+        .text-gray-300 { color: #d1d5db; }
+
+        .hover\:text-ink:hover { color: var(--ink); }
+        .hover\:text-\[\#e55a5a\]:hover { color: #e55a5a; }
+
+        /* Backgrounds */
+        .bg-white { background-color: #ffffff; }
+        .bg-gray-50 { background-color: #f9fafb; }
+        .bg-gray-50\/60 { background-color: rgba(249, 250, 251, 0.6); }
+        .bg-gray-100 { background-color: #f3f4f6; }
+        .bg-gray-300 { background-color: #d1d5db; }
+        .bg-\[\#FFF0EE\] { background-color: #FFF0EE; }
+        .bg-\[\#FFFBFB\] { background-color: #FFFBFB; }
+        .bg-\[\#F0FDF4\] { background-color: #F0FDF4; }
+        .bg-\[\#FFFBEB\] { background-color: #FFFBEB; }
+        .bg-\[\#F9F8F7\] { background-color: #F9F8F7; }
+        .bg-\[\#FEF2F2\] { background-color: #FEF2F2; }
+        .bg-\[\#FFF8F7\] { background-color: #FFF8F7; }
+        .bg-\[\#E87A5D\] { background-color: #E87A5D; }
+        .bg-\[\#D4956B\] { background-color: #D4956B; }
+        .bg-\[\#1A1A1A\] { background-color: #1A1A1A; }
+        .bg-glow-start { background-color: var(--glow-start); }
+        .bg-green-500 { background-color: #22c55e; }
+        .bg-green-600 { background-color: #16a34a; }
+        .bg-white\/10 { background-color: rgba(255, 255, 255, 0.1); }
+
+        /* Borders & Corners */
+        .border { border-style: solid; border-width: 1px; }
+        .border-t { border-top-style: solid; border-top-width: 1px; }
+        .border-b { border-bottom-style: solid; border-bottom-width: 1px; }
+        .border-gray-100 { border-color: #f3f4f6; }
+        .border-gray-100\/60 { border-color: rgba(243, 244, 246, 0.6); }
+        .border-gray-50 { border-color: #f9fafb; }
+        .border-gray-200 { border-color: #e5e7eb; }
+        .border-glow-start\/20 { border-color: rgba(255, 107, 107, 0.2); }
+        .border-glow-start\/15 { border-color: rgba(255, 107, 107, 0.15); }
+        .border-glow-start\/10 { border-color: rgba(255, 107, 107, 0.10); }
+
+        .rounded-md { border-radius: 0.375rem; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .rounded-xl { border-radius: 0.75rem; }
+        .rounded-2xl { border-radius: 1rem; }
+        .rounded-full { border-radius: 9999px; }
+
+        /* Shadows & Rings */
+        .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        .shadow-card { box-shadow: var(--shadow-card); }
+        .ring-1 { box-shadow: 0 0 0 1px currentColor; }
+        .ring-glow-start\/20 { box-shadow: 0 0 0 1px rgba(255, 107, 107, 0.2); }
+        .ring-glow-start\/10 { box-shadow: 0 0 0 1px rgba(255, 107, 107, 0.1); }
+
+        /* Positioning & Structure */
+        .relative { position: relative; }
+        .absolute { position: absolute; }
+        .fixed { position: fixed; }
+        .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+        .z-0 { z-index: 0; }
+        .z-10 { z-index: 10; }
+        .pointer-events-none { pointer-events: none; }
+        .overflow-hidden { overflow: hidden; }
+        .overflow-x-auto { overflow-x: auto; }
+
+        /* Transitions & Filters */
+        .transition-colors { transition-property: color, background-color, border-color; transition-duration: 0.15s; }
+        .transition-transform { transition-property: transform; transition-duration: 0.15s; }
+        .duration-300 { transition-duration: 0.3s; }
+        .duration-400 { transition-duration: 0.4s; }
+        .backdrop-blur-sm { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 
         /* ── Glow Orbs ── */
         .glow-orb {
@@ -213,8 +409,7 @@
             animation: pulse 2.2s ease-in-out infinite;
         }
         @keyframes pulse {
-            0%,
-            100% {
+            0%, 100% {
                 box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.5);
             }
             50% {
@@ -300,7 +495,7 @@
         }
     </style>
 </head>
-<body class="bg-[#F9F8F7] text-[#1A1A1A] antialiased">
+<body class="bg-[#F9F8F7] text-[#1A1A1A]">
 
     <!-- ════════════════ GLOW ORBS (Background) ════════════════ -->
     <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -319,17 +514,17 @@
                 <span class="text-sm font-semibold tracking-wide uppercase text-ink-muted">Anthropic • Q3 2026 Audit</span>
             </div>
             <div class="hidden sm:flex gap-6 text-sm font-medium text-ink-muted">
-                <a href="#benchmarks" class="hover:text-ink transition-colors duration-300">Benchmarks</a>
-                <a href="#tco" class="hover:text-ink transition-colors duration-300">TCO</a>
-                <a href="#tokenizer" class="hover:text-ink transition-colors duration-300">Tokenizer</a>
-                <a href="#safety" class="hover:text-ink transition-colors duration-300">Safety</a>
+                <a href="#benchmarks" class="text-ink-muted hover:text-ink transition-colors duration-300">Benchmarks</a>
+                <a href="#tco" class="text-ink-muted hover:text-ink transition-colors duration-300">TCO</a>
+                <a href="#tokenizer" class="text-ink-muted hover:text-ink transition-colors duration-300">Tokenizer</a>
+                <a href="#safety" class="text-ink-muted hover:text-ink transition-colors duration-300">Safety</a>
             </div>
         </nav>
 
         <!-- ── HERO ── -->
         <header class="mb-20 reveal">
             <p class="text-xs font-semibold tracking-[0.2em] uppercase text-glow-start mb-4">Infrastructure Audit & Performance TCO Report</p>
-            <h1 class="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-[1.05] tracking-tight text-ink max-w-4xl">
+            <h1 class="text-4xl sm:text-5xl lg:text-7xl font-black leading-relaxed tracking-tight text-ink max-w-4xl">
                 Claude Sonnet&nbsp;5<span class="text-glow-start">,</span> Sonnet&nbsp;4.6<span class="text-glow-start">,</span>
                 <br class="hidden sm:block" />&amp; Opus&nbsp;4.8
             </h1>
@@ -563,7 +758,7 @@
 
             <!-- Pricing Table -->
             <div class="bg-white rounded-2xl shadow-card border border-gray-100/60 overflow-x-auto mb-8">
-                <table class="w-full text-sm">
+                <table class="w-full text-sm" style="border-collapse: collapse;">
                     <thead class="bg-gray-50/60 border-b border-gray-100">
                         <tr>
                             <th class="text-left px-5 py-4 font-semibold text-ink">Model</th>
@@ -992,7 +1187,6 @@
                             if (targetWidth) {
                                 bar.style.setProperty('--target-width', targetWidth + '%');
                                 bar.classList.add('animated');
-                                // Re-trigger animation
                                 bar.style.animation = 'none';
                                 bar.offsetHeight;
                                 bar.style.animation = '';
@@ -1039,7 +1233,6 @@
                             function updateCounter(now) {
                                 const elapsed = now - startTime;
                                 const progress = Math.min(elapsed / duration, 1);
-                                // Ease-out cubic
                                 const eased = 1 - Math.pow(1 - progress, 3);
                                 current = targetVal * eased;
                                 counter.textContent = Math.round(current);
